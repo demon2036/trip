@@ -19,9 +19,9 @@ expedia_hotels.py — 查 Expedia 酒店价格（个人行程比价用）。
 依赖：patchright + 系统 Google Chrome(channel="chrome") + pycryptodome + secretstorage。
 
 用法示例：
-  python3 expedia_hotels.py --checkin 2026-07-10 --nights 7 --format md
-  python3 expedia_hotels.py --destination "神戸" --checkin 2026-07-10 --checkout 2026-07-17 --json
-  python3 expedia_hotels.py --checkin 2026-07-10 --screenshot ~/trip/kobe.png --debug
+  python3 cli/expedia_hotels.py --checkin 2026-07-10 --nights 7 --format md
+  python3 cli/expedia_hotels.py --destination "神戸" --checkin 2026-07-10 --checkout 2026-07-17 --json
+  python3 cli/expedia_hotels.py --checkin 2026-07-10 --screenshot ~/trip/kobe.png --debug
 """
 
 import argparse

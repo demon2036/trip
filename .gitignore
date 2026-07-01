@@ -9,3 +9,6 @@ __pycache__/
 .env
 
 .DS_Store
+
+# Claude Code 本地工具状态，不是项目源码
+.claude/

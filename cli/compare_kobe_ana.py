@@ -11,6 +11,9 @@ from pathlib import Path
 # 1 HKD = 0.93 CNY (Approximate exchange rate for comparison)
 HKD_TO_CNY = 0.93
 
+# 同目录下的 CLI 脚本，用绝对路径引用而不是裸文件名——不依赖调用者的 cwd 恰好是 cli/
+SCRIPT_DIR = Path(__file__).resolve().parent
+
 
 def _run_and_extract(script, extra_args, date, tag, match_fn, extract_fn, max_tries=3, sleep_s=2):
     """跑一次比价脚本(CLI 子进程)，重试 max_tries 次；命中 match_fn 就用 extract_fn 取字段返回。"""
@@ -48,7 +51,7 @@ def run_ctrip(date, max_tries=3):
                 "currency": "CNY"}
 
     return _run_and_extract(
-        "ctrip_hotels.py", ["--city-id", "423", "--limit", "100"],
+        str(SCRIPT_DIR / "ctrip_hotels.py"), ["--city-id", "423", "--limit", "100"],
         date, "Ctrip", match, extract, max_tries, sleep_s=2)
 
 
@@ -65,7 +68,7 @@ def run_expedia(date, max_tries=3):
                 "currency": "HKD"}
 
     return _run_and_extract(
-        "expedia_hotels.py",
+        str(SCRIPT_DIR / "expedia_hotels.py"),
         ["--base-url", "www.expedia.com.hk", "--destination", "Kobe", "--limit", "150"],
         date, "Expedia", match, extract, max_tries, sleep_s=3)
 
