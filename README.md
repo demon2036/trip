@@ -2,7 +2,7 @@
 
 个人旅行比价用的自动化工具集。核心思路不是"写一个更强的爬虫"，而是一个 **harness（驾驭/复用真实会话的框架）**：把你日常真实 Chrome 里已经过检、已登录的会话原样接管过来，驱动一个独立的沙箱浏览器去问携程、Expedia 要价格，而不是从零冒充一个"看起来像人"的机器人。
 
-它不是一个通用爬虫框架，而是**为携程 (Ctrip) 和 Expedia 这两个目标站点量身定制**的一组脚本，能查酒店、机票、具体房型，外加一个天气预测工具和一个示例比价脚本。
+它不是一个通用爬虫框架，而是**为携程 (Ctrip)、Expedia、Google Maps、Tabelog 等目标站点量身定制**的一组脚本，能查酒店、机票、具体房型、餐厅候选，外加一个天气预测工具和一个示例比价脚本。
 
 ---
 
@@ -71,9 +71,12 @@ weather/             天气预测：城市 + 山地/具体地点，不需要 coo
   open_meteo.py        Open-Meteo 三级 fallback 请求逻辑
   forecast.py          编排 + CLI 入口
 
+food/                餐厅候选：Google Maps 现实信号 + Tabelog 本地口碑（food/README.md）
+  discovery.py         Google Maps 浏览器 harness/可选 Places API + Tabelog 解析 + 合并输出
+
 cli/                 命令行入口，本项目实际"运行"的地方（cli/README.md）
   ctrip_hotels.py / ctrip_flights.py / ctrip_room_details.py
-  expedia_hotels.py / expedia_room_details.py / weather_forecast.py
+  expedia_hotels.py / expedia_room_details.py / weather_forecast.py / food_discovery.py
                        顶层 CLI 入口（几行代码，直接调用上面对应的包），
                        保留这些文件名只是为了命令行调用方式不变——不是遗留代码，
                        删掉会导致下面所有调用示例失效
@@ -109,7 +112,21 @@ python3 cli/ctrip_flights.py --from hkg --to osa --date 2026-07-10 --format md
 
 # 往返
 python3 cli/ctrip_flights.py --from hkg --to osa --date 2026-07-10 --return 2026-07-17 --format md
+
+# 默认只看直飞；如需中转可加 --all-flights
+python3 cli/ctrip_flights.py --from can --to ngo --date 2026-12-16 --return 2026-12-22 --format md
+
+# 批量查询：同一个浏览器会话里顺序跑多条，不重复起关 Chrome
+python3 cli/ctrip_flights.py \
+  --query can-nrt,2026-12-16,2026-12-22 \
+  --query can-ngo,2026-12-16,2026-12-22 \
+  --format md
+
+# 也可以用逗号批量展开目的地/日期
+python3 cli/ctrip_flights.py --from can --to nrt,ngo,kix --date 2026-12-16 --return 2026-12-22 --format md
 ```
+城市码无结果时会自动 fallback 到机场码，例如 `tyo` 会继续查 `nrt` / `hnd`；如需严格只查输入的三字码，加 `--no-city-fallback`。
+默认只返回 `直飞` 航班；如需把中转也带上，加 `--all-flights`。
 
 ### 3. 携程酒店房型明细 `cli/ctrip_room_details.py`
 
@@ -160,7 +177,34 @@ python3 cli/weather_forecast.py --latitude 36.57 --longitude 137.57 --elevation 
 为什么没有接入 tenki.jp 之类的日本消费级天气站爬虫、山地点位坐标是怎么核实的，
 详见 `weather/README.md`。
 
-### 7. 示例比价脚本 `cli/compare_kobe_ana.py`
+### 7. 餐厅候选 `cli/food_discovery.py`
+
+围绕给定的**区域 + 日期 + 饭点**，收集 Google Maps top results 和 Tabelog 前 20 个候选，
+合并输出评分、评论数、预算、休息日、预约方式、电话/链接、营业状态和置信度。`auto`
+模式下：有 `GOOGLE_MAPS_API_KEY` 时走 Places API；没有 key 且不是 headless 时尝试
+Google Maps 浏览器 harness；headless 无 key 时跳过 Google、直接返回 Tabelog 稳定结果。
+
+```bash
+# 自动模式：能用 Google 就合并 Google，否则至少返回 Tabelog
+python3 cli/food_discovery.py --area "Osaka Namba" --date 2026-08-01 --meal dinner --format md
+
+# 指定菜系
+python3 cli/food_discovery.py --area "Kobe Sannomiya" --date 2026-08-02 --meal dinner \
+  --cuisine sushi yakiniku --format md
+
+# 只看 Tabelog 本地榜单
+python3 cli/food_discovery.py --area "Osaka Namba" --date 2026-08-01 --meal dinner \
+  --google-mode off --format md
+
+# 强制 Google Maps 浏览器 harness（适合有界面的本机 Chrome，会注入 google.com cookie）
+python3 cli/food_discovery.py --area "Osaka Namba" --date 2026-08-01 --meal dinner \
+  --google-mode browser --format md
+```
+
+详见 `food/README.md`。注意：Google Maps 浏览器列表页的营业信号主要是"当前显示"，
+不是未来某天饭点的确定营业；输出会用 `open_confidence` 标明置信度。
+
+### 8. 示例比价脚本 `cli/compare_kobe_ana.py`
 
 并行调用携程 + Expedia HK，对**神户全日空皇冠假日酒店（ANA Crowne Plaza Kobe）**未来 7 天的价格做比价，自动按当前汇率换算、给出哪家便宜：
 

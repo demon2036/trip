@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from ctrip.hotels import parse_card
-from ctrip.flights import parse_flight
+from ctrip.flights import _collect_flights, build_url, city_fallback_queries, parse_flight, parse_query_spec
 from ctrip.room_details import parse_room_block as ctrip_parse_room
 from expedia.hotels import parse_prices, parse_review, city_from_url
 from expedia.room_details import parse_room_block as expedia_parse_room
@@ -63,6 +63,89 @@ def test_ctrip_flight():
     assert f["arrive_time"] == "10:45"
     assert f["stops"] == "直飞"
     assert f["price_tax_incl"] == 1580.0
+
+
+def test_ctrip_collect_flights_direct_only_default():
+    direct = "\n".join([
+        "中国东方航空",
+        "MU5678",
+        "空客A320",
+        "08:30",
+        "10:45",
+        "上海虹桥国际机场T2",
+        "大阪关西国际机场T1",
+        "2小时15分",
+        "直飞",
+        "¥1580",
+    ])
+    transfer = "\n".join([
+        "越南航空",
+        "VN123",
+        "16:25",
+        "06:30",
+        "白云国际机场T2",
+        "中部国际机场T1",
+        "13小时5分",
+        "中转",
+        "¥1200",
+    ])
+    flights = _collect_flights([direct, transfer], limit=10)
+    assert len(flights) == 1
+    assert flights[0]["flight_no"] == "MU5678"
+
+
+def test_ctrip_collect_flights_all_flights():
+    direct = "\n".join([
+        "中国东方航空",
+        "MU5678",
+        "08:30",
+        "10:45",
+        "上海虹桥国际机场T2",
+        "大阪关西国际机场T1",
+        "2小时15分",
+        "直飞",
+        "¥1580",
+    ])
+    transfer = "\n".join([
+        "越南航空",
+        "VN123",
+        "16:25",
+        "06:30",
+        "白云国际机场T2",
+        "中部国际机场T1",
+        "13小时5分",
+        "中转",
+        "¥1200",
+    ])
+    flights = _collect_flights([direct, transfer], limit=10, direct_only=False)
+    assert [f["flight_no"] for f in flights] == ["VN123", "MU5678"]
+
+
+def test_ctrip_flight_query_spec():
+    q = parse_query_spec("can-nrt,2026-12-16,2026-12-22")
+    assert q.frm == "can"
+    assert q.to == "nrt"
+    assert q.date == "2026-12-16"
+    assert q.ret == "2026-12-22"
+
+    q = parse_query_spec("can-ngo:2026-12-16..2026-12-22")
+    assert q.frm == "can"
+    assert q.to == "ngo"
+    assert q.date == "2026-12-16"
+    assert q.ret == "2026-12-22"
+
+
+def test_ctrip_flight_build_round_url():
+    url = build_url("can", "ngo", "2026-12-16", "2026-12-22", "Y_S", 1, 0)
+    assert "/online/list/round-can-ngo?" in url
+    assert "depdate=2026-12-16_2026-12-22" in url
+
+
+def test_ctrip_flight_city_fallback_queries():
+    q = parse_query_spec("can-tyo,2026-12-16,2026-12-22")
+    expanded = city_fallback_queries(q)
+    assert [item.to for item in expanded] == ["nrt", "hnd"]
+    assert all(item.requested_route == "CAN→TYO→CAN" for item in expanded)
 
 
 def test_ctrip_room_block():
